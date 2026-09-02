@@ -1,7 +1,7 @@
 // ============ KONFIGURASI ADMIN ============
 const WHATSAPP_NUMBER = "6285960426687";
-const EMAIL = "hesarajagaram@gmail.com";
-const INSTAGRAM_URL = "https://www.instagram.com/hesa_sixseven/";
+const EMAIL = "warungrobux@gmail.com";
+const INSTAGRAM_URL = "https://www.instagram.com/WarungRobuxGG/";
 const PANDUAN_URL = "#panduan";
 
 
