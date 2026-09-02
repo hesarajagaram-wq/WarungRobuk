@@ -1,6 +1,8 @@
 // ============ KONFIGURASI ADMIN ============
-const WHATSAPP_NUMBER = "6285960426687"; // ganti dengan nomor WhatsApp admin
-const PANDUAN_URL = "#panduan"; // ganti dengan link video/halaman panduan
+const WHATSAPP_NUMBER = "6285960426687";
+const EMAIL = "hesarajagaram@gmail.com";
+const INSTAGRAM_URL = "https://www.instagram.com/hesa_sixseven/";
+const PANDUAN_URL = "#panduan";
 
 
 const LEGAL_CONTENT = {
