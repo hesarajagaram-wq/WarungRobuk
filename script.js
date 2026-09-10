@@ -2,7 +2,6 @@
 const WHATSAPP_NUMBER = "6285960426687";
 const EMAIL = "warungrobux@gmail.com";
 const INSTAGRAM_URL = "https://www.instagram.com/WarungRobuxGG/";
-const PANDUAN_URL = "#panduan";
 
 
 const LEGAL_CONTENT = {
@@ -12,9 +11,9 @@ const LEGAL_CONTENT = {
       <p>WarungRobux menghargai privasi setiap pelanggan. Data yang diberikan saat checkout digunakan untuk memproses pesanan dan membantu pelayanan pelanggan.</p>
       <h4>Data yang dikumpulkan</h4>
       <ul>
-        <li>Username Roblox dan User ID untuk kebutuhan pemrosesan produk.</li>
-        <li>Nomor WhatsApp untuk komunikasi pesanan dan konfirmasi pembayaran.</li>
+        <li>Username Roblox untuk kebutuhan pemrosesan produk.</li>
         <li>Catatan pesanan yang kamu isi secara sukarela.</li>
+        <li>Detail komunikasi pesanan yang kamu sampaikan melalui WhatsApp admin.</li>
       </ul>
       <h4>Penggunaan data</h4>
       <p>Data digunakan hanya untuk keperluan pemesanan, komunikasi dengan admin, pengecekan transaksi, dan dukungan pelanggan. WarungRobux tidak meminta password akun Roblox melalui website ini.</p>
@@ -49,7 +48,7 @@ const LEGAL_CONTENT = {
         <li>Kasus lain akan diperiksa berdasarkan bukti transaksi dan kondisi pesanan.</li>
       </ul>
       <h4>Kondisi yang tidak otomatis mendapatkan refund</h4>
-      <p>Kesalahan username, User ID, tautan Gamepass, atau detail lain yang diberikan pelanggan dapat memengaruhi kelayakan refund. Pesanan yang sudah berhasil diproses umumnya tidak dapat dibatalkan.</p>
+      <p>Kesalahan username, tautan Gamepass, atau detail lain yang diberikan pelanggan dapat memengaruhi kelayakan refund. Pesanan yang sudah berhasil diproses umumnya tidak dapat dibatalkan.</p>
       <h4>Cara mengajukan</h4>
       <p>Hubungi admin melalui WhatsApp dengan menyertakan kode transaksi, bukti pembayaran, dan penjelasan masalah. Keputusan refund dilakukan setelah verifikasi.</p>
     `
@@ -85,18 +84,21 @@ const TESTIMONIALS = [
 
 // ============ DATA FAQ (mudah diedit) ============
 const FAQS = [
-  { q: "Bagaimana cara membeli Robux?", a: "Pilih produk Robux sesuai nominal yang diinginkan pada bagian Produk, klik Beli Sekarang, isi data pesanan, lalu selesaikan pembayaran melalui WhatsApp admin." },
+  { q: "Bagaimana cara membeli Robux?", a: "Pilih produk Robux sesuai nominal yang diinginkan pada bagian Produk, klik Tambah ke Keranjang, buka keranjang, lalu lanjutkan checkout." },
   { q: "Berapa lama proses pesanan?", a: "Rata-rata pesanan diproses dalam 5-15 menit setelah pembayaran dikonfirmasi oleh admin, tergantung jenis produk dan antrian." },
   { q: "Bagaimana cara membeli Gamepass?", a: "Pilih kategori Gamepass, pilih paket sesuai harga Gamepass tujuan, lalu isi tautan/detail Gamepass pada kolom catatan saat checkout." },
-  { q: "Bagaimana cara order Joki?", a: "Pilih layanan Joki yang diinginkan, isi username dan detail akun pada form checkout, lalu koordinasikan jadwal joki bersama admin via WhatsApp." },
-  { q: "Bagaimana cara pembayaran?", a: "Setelah checkout, kamu akan diarahkan ke WhatsApp admin dengan rincian pesanan otomatis. Admin akan memberikan instruksi metode pembayaran yang tersedia." },
-  { q: "Bagaimana cara cek transaksi?", a: "Gunakan form Cek Transaksi dengan memasukkan Kode Transaksi atau Username Roblox untuk melihat status pesanan kamu." },
+  { q: "Bagaimana cara order Joki?", a: "Pilih layanan Joki yang diinginkan, tambahkan ke keranjang, lalu koordinasikan jadwal joki bersama admin via WhatsApp setelah checkout." },
+  { q: "Bagaimana cara pembayaran?", a: "Setelah checkout, kamu akan diarahkan ke WhatsApp admin dengan rincian pesanan dan kode transaksi otomatis. Admin akan memberikan instruksi metode pembayaran yang tersedia." },
+  { q: "Bagaimana cara cek transaksi?", a: "Gunakan form Cek Transaksi dengan memasukkan Kode Transaksi (mis. WR-2026-0001) atau Username Roblox untuk melihat status pesanan kamu." },
 ];
 
 // ============ STATE ============
-let cartCount = 0;
 let currentFilter = "semua";
 let currentSearch = "";
+let cart = []; // { id, qty }
+let orderHistory = []; // { code, items:[{nama,qty,harga}], username, note, total, status, date }
+let orderCounter = 0;
+let loggedInUser = null;
 
 // ============ HELPERS ============
 function formatRupiah(num){
@@ -114,6 +116,16 @@ function showToast(msg){
   toast.classList.add("show");
   clearTimeout(showToast._t);
   showToast._t = setTimeout(() => toast.classList.remove("show"), 2600);
+}
+
+function findProduct(id){
+  return PRODUCTS.find(p => p.id === id);
+}
+
+function generateTransactionCode(){
+  orderCounter += 1;
+  const year = new Date().getFullYear();
+  return `WR-${year}-${String(orderCounter).padStart(4, "0")}`;
 }
 
 // ============ RENDER: PRODUCT CARD ============
@@ -136,7 +148,7 @@ function renderProductCard(p, variant){
       <span class="product-cat">${p.kategori}</span>
       <h3 class="product-name">${p.nama}</h3>
       <div class="product-price">${hargaCoretHtml}${formatRupiah(p.harga)}</div>
-      <button class="product-buy" data-id="${p.id}">Beli Sekarang</button>
+      <button class="product-buy" data-id="${p.id}" type="button">+ Tambah Keranjang</button>
     </div>
   `;
   return card;
@@ -198,7 +210,7 @@ function renderTestimonials(){
 function renderFaq(){
   const list = document.getElementById("faqList");
   list.innerHTML = "";
-  FAQS.forEach((f, i) => {
+  FAQS.forEach((f) => {
     const item = document.createElement("div");
     item.className = "faq-item";
     item.innerHTML = `
@@ -211,7 +223,6 @@ function renderFaq(){
     const btn = item.querySelector(".faq-q");
     btn.addEventListener("click", () => {
       const isOpen = item.classList.contains("open");
-      // tutup semua
       list.querySelectorAll(".faq-item").forEach(el => {
         el.classList.remove("open");
         el.querySelector(".faq-a").style.maxHeight = null;
@@ -231,7 +242,7 @@ function renderFaq(){
 // ============ NAVBAR: sticky active link on scroll ============
 function setupScrollSpy(){
   const sections = document.querySelectorAll("main section[id], .hero[id]");
-  const links = document.querySelectorAll(".nav-menu .nav-link");
+  const links = document.querySelectorAll(".nav-menu > a.nav-link");
   const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
       if (entry.isIntersecting){
@@ -266,7 +277,53 @@ function setupMobileMenu(){
   }
   hamburger.addEventListener("click", toggleMenu);
   overlay.addEventListener("click", closeMenu);
-  mobileMenu.querySelectorAll(".nav-link, .btn").forEach(a => a.addEventListener("click", closeMenu));
+
+  mobileMenu.querySelectorAll(".nav-link:not(.mobile-submenu-toggle), .mobile-sub-link, .btn").forEach(a => {
+    a.addEventListener("click", closeMenu);
+  });
+
+  window.__closeMobileMenu = closeMenu;
+}
+
+// ============ NAV DROPDOWN (desktop "Produk") ============
+function setupNavDropdown(){
+  const dropdown = document.querySelector(".nav-dropdown");
+  const toggle = document.getElementById("produkDropdownToggle");
+  if (!dropdown || !toggle) return;
+
+  toggle.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const willOpen = !dropdown.classList.contains("open");
+    dropdown.classList.toggle("open", willOpen);
+    toggle.setAttribute("aria-expanded", String(willOpen));
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!dropdown.contains(e.target)){
+      dropdown.classList.remove("open");
+      toggle.setAttribute("aria-expanded", "false");
+    }
+  });
+
+  dropdown.querySelectorAll(".dropdown-item").forEach(item => {
+    item.addEventListener("click", () => {
+      dropdown.classList.remove("open");
+      toggle.setAttribute("aria-expanded", "false");
+    });
+  });
+}
+
+// ============ MOBILE SUBMENU (accordion "Produk") ============
+function setupMobileSubmenu(){
+  const submenu = document.querySelector(".mobile-submenu");
+  const toggle = document.getElementById("mobileProdukToggle");
+  if (!submenu || !toggle) return;
+
+  toggle.addEventListener("click", () => {
+    const willOpen = !submenu.classList.contains("open");
+    submenu.classList.toggle("open", willOpen);
+    toggle.setAttribute("aria-expanded", String(willOpen));
+  });
 }
 
 // ============ SEARCH BAR (navbar) ============
@@ -284,6 +341,8 @@ function setupNavSearch(){
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter"){
       currentSearch = input.value;
+      currentFilter = "semua";
+      document.querySelectorAll("#filterChips .chip").forEach(c => c.classList.toggle("active", c.dataset.filter === "semua"));
       document.getElementById("filterSearchInput").value = input.value;
       renderPopulerGrid();
       bar.classList.remove("open");
@@ -311,7 +370,19 @@ function setupFilters(){
   });
 }
 
-// ============ KATEGORI CARD -> auto filter & scroll ============
+function applyCategoryFilter(kategori){
+  currentFilter = kategori;
+  currentSearch = "";
+  const search = document.getElementById("filterSearchInput");
+  if (search) search.value = "";
+  document.querySelectorAll("#filterChips .chip").forEach(c => {
+    c.classList.toggle("active", c.dataset.filter === kategori);
+  });
+  renderPopulerGrid();
+  document.getElementById("produk-populer").scrollIntoView({ behavior: "smooth" });
+}
+
+// ============ KATEGORI CARD & DROPDOWN LINKS -> auto filter & scroll ============
 function setupCategoryLinks(){
   const map = { "kategori-robux": "robux", "kategori-gamepass": "gamepass", "kategori-joki": "joki", "kategori-item": "item" };
   Object.keys(map).forEach(id => {
@@ -319,39 +390,173 @@ function setupCategoryLinks(){
     if (!el) return;
     el.addEventListener("click", (e) => {
       e.preventDefault();
-      const kategori = map[id];
-      currentFilter = kategori;
-      currentSearch = "";
-      const search = document.getElementById("filterSearchInput");
-      if (search) search.value = "";
-      document.querySelectorAll("#filterChips .chip").forEach(c => {
-        c.classList.toggle("active", c.dataset.filter === kategori);
-      });
-      renderPopulerGrid();
-      document.getElementById("produk-populer").scrollIntoView({ behavior: "smooth" });
+      applyCategoryFilter(map[id]);
+    });
+  });
+
+  document.querySelectorAll("[data-category-link]").forEach(el => {
+    el.addEventListener("click", (e) => {
+      e.preventDefault();
+      applyCategoryFilter(el.dataset.categoryLink);
+      if (typeof window.__closeMobileMenu === "function") window.__closeMobileMenu();
     });
   });
 }
 
-// ============ CHECKOUT MODAL ============
-let activeProduct = null;
-
-function populateProductSelect(){
-  const select = document.getElementById("ckProduct");
-  select.innerHTML = PRODUCTS.map(p => `<option value="${p.id}">${p.nama} — ${formatRupiah(p.harga)}</option>`).join("");
+// ============ CART ============
+function addToCart(id){
+  const existing = cart.find(c => c.id === id);
+  if (existing){
+    existing.qty += 1;
+  } else {
+    cart.push({ id, qty: 1 });
+  }
+  updateCartBadge();
+  renderCart();
+  const product = findProduct(id);
+  showToast(`${product ? product.nama : "Produk"} ditambahkan ke keranjang`);
 }
 
-function openCheckout(productId){
-  const product = PRODUCTS.find(p => p.id === productId) || PRODUCTS[0];
-  activeProduct = product;
-  document.getElementById("ckProduct").value = product.id;
-  document.getElementById("ckQty").value = 1;
-  document.getElementById("ckVariasi").value = "Standar";
+function removeFromCart(id){
+  cart = cart.filter(c => c.id !== id);
+  updateCartBadge();
+  renderCart();
+}
+
+function changeCartQty(id, delta){
+  const item = cart.find(c => c.id === id);
+  if (!item) return;
+  item.qty += delta;
+  if (item.qty <= 0){
+    removeFromCart(id);
+    return;
+  }
+  updateCartBadge();
+  renderCart();
+}
+
+function getCartCount(){
+  return cart.reduce((sum, c) => sum + c.qty, 0);
+}
+
+function getCartTotal(){
+  return cart.reduce((sum, c) => {
+    const p = findProduct(c.id);
+    return sum + (p ? p.harga * c.qty : 0);
+  }, 0);
+}
+
+function updateCartBadge(){
+  const badge = document.getElementById("cartBadge");
+  const count = getCartCount();
+  badge.textContent = count;
+  badge.hidden = count === 0;
+}
+
+function renderCart(){
+  const list = document.getElementById("cartList");
+  const emptyState = document.getElementById("cartEmptyState");
+  const summary = document.getElementById("cartSummary");
+  list.innerHTML = "";
+
+  if (cart.length === 0){
+    emptyState.hidden = false;
+    summary.hidden = true;
+    return;
+  }
+  emptyState.hidden = true;
+  summary.hidden = false;
+
+  cart.forEach(c => {
+    const p = findProduct(c.id);
+    if (!p) return;
+    const row = document.createElement("div");
+    row.className = "cart-item";
+    row.innerHTML = `
+      <div class="cart-item-thumb"><img src="${p.gambar}" alt="${p.nama}"></div>
+      <div class="cart-item-info">
+        <div class="cart-item-name">${p.nama}</div>
+        <div class="cart-item-price">${formatRupiah(p.harga)}</div>
+      </div>
+      <div class="cart-item-qty">
+        <button class="qty-btn" type="button" data-action="dec" data-id="${p.id}">−</button>
+        <span>${c.qty}</span>
+        <button class="qty-btn" type="button" data-action="inc" data-id="${p.id}">+</button>
+      </div>
+      <button class="cart-item-remove" type="button" data-action="remove" data-id="${p.id}">Hapus</button>
+    `;
+    list.appendChild(row);
+  });
+
+  document.getElementById("cartTotal").textContent = formatRupiah(getCartTotal());
+}
+
+function openCart(){
+  renderCart();
+  document.getElementById("cartOverlay").classList.add("open");
+  document.getElementById("cartOverlay").setAttribute("aria-hidden", "false");
+  document.body.style.overflow = "hidden";
+}
+
+function closeCart(){
+  document.getElementById("cartOverlay").classList.remove("open");
+  document.getElementById("cartOverlay").setAttribute("aria-hidden", "true");
+  document.body.style.overflow = "";
+}
+
+function setupCart(){
+  document.getElementById("cartToggle").addEventListener("click", openCart);
+  document.getElementById("cartClose").addEventListener("click", closeCart);
+  document.getElementById("cartOverlay").addEventListener("click", (e) => {
+    if (e.target.id === "cartOverlay") closeCart();
+  });
+
+  document.getElementById("cartList").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+    const id = btn.dataset.id;
+    const action = btn.dataset.action;
+    if (action === "inc") changeCartQty(id, 1);
+    if (action === "dec") changeCartQty(id, -1);
+    if (action === "remove") removeFromCart(id);
+  });
+
+  document.body.addEventListener("click", (e) => {
+    const buyBtn = e.target.closest(".product-buy");
+    if (buyBtn) addToCart(buyBtn.dataset.id);
+  });
+
+  document.getElementById("cartCheckoutBtn").addEventListener("click", () => {
+    if (cart.length === 0) return;
+    closeCart();
+    openCheckout();
+  });
+}
+
+// ============ CHECKOUT MODAL ============
+function renderCheckoutOrderSummary(){
+  const box = document.getElementById("checkoutOrderSummary");
+  box.innerHTML = cart.map(c => {
+    const p = findProduct(c.id);
+    if (!p) return "";
+    return `
+      <div class="checkout-order-item">
+        <span>${p.nama}<small>${c.qty} x ${formatRupiah(p.harga)}</small></span>
+        <span>${formatRupiah(p.harga * c.qty)}</span>
+      </div>
+    `;
+  }).join("");
+  document.getElementById("sumTotal").textContent = formatRupiah(getCartTotal());
+}
+
+function openCheckout(){
+  if (cart.length === 0){
+    showToast("Keranjang masih kosong. Pilih produk terlebih dahulu.");
+    return;
+  }
   document.getElementById("ckUsername").value = "";
-  document.getElementById("ckUserId").value = "";
-  document.getElementById("ckPhone").value = "";
   document.getElementById("ckNote").value = "";
-  updateSummary();
+  renderCheckoutOrderSummary();
   document.getElementById("checkoutOverlay").classList.add("open");
   document.body.style.overflow = "hidden";
 }
@@ -361,157 +566,197 @@ function closeCheckout(){
   document.body.style.overflow = "";
 }
 
-function updateSummary(){
-  const productId = document.getElementById("ckProduct").value;
-  const product = PRODUCTS.find(p => p.id === productId);
-  const qty = Math.max(1, parseInt(document.getElementById("ckQty").value) || 1);
-  if (!product) return;
-  document.getElementById("sumHarga").textContent = formatRupiah(product.harga);
-  document.getElementById("sumJumlah").textContent = qty;
-  document.getElementById("sumTotal").textContent = formatRupiah(product.harga * qty);
-}
-
 function setupCheckoutModal(){
-  populateProductSelect();
-
-  document.body.addEventListener("click", (e) => {
-    const buyBtn = e.target.closest(".product-buy");
-    if (buyBtn){
-      openCheckout(buyBtn.dataset.id);
-    }
-  });
-
   document.getElementById("checkoutClose").addEventListener("click", closeCheckout);
   document.getElementById("checkoutOverlay").addEventListener("click", (e) => {
     if (e.target.id === "checkoutOverlay") closeCheckout();
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeCheckout();
+    if (e.key === "Escape"){
+      closeCheckout();
+      closeCart();
+      closeLegalModal();
+      closeLoginModal();
+    }
   });
-
-  document.getElementById("ckProduct").addEventListener("change", updateSummary);
-  document.getElementById("ckQty").addEventListener("input", updateSummary);
 
   document.getElementById("checkoutForm").addEventListener("submit", (e) => {
     e.preventDefault();
-    const product = PRODUCTS.find(p => p.id === document.getElementById("ckProduct").value);
-    const qty = Math.max(1, parseInt(document.getElementById("ckQty").value) || 1);
-    const variasi = document.getElementById("ckVariasi").value.trim() || "-";
-    const username = document.getElementById("ckUsername").value.trim();
-    const userId = document.getElementById("ckUserId").value.trim();
-    const phone = document.getElementById("ckPhone").value.trim();
-    const note = document.getElementById("ckNote").value.trim() || "-";
-    const total = product.harga * qty;
-
-    if (!username || !userId || !phone){
-      showToast("Lengkapi data pesanan terlebih dahulu.");
+    if (cart.length === 0){
+      showToast("Keranjang masih kosong.");
       return;
     }
+    const username = document.getElementById("ckUsername").value.trim();
+    const note = document.getElementById("ckNote").value.trim() || "-";
+
+    if (!username){
+      showToast("Isi username Roblox terlebih dahulu.");
+      return;
+    }
+
+    const items = cart.map(c => {
+      const p = findProduct(c.id);
+      return { nama: p.nama, qty: c.qty, harga: p.harga };
+    });
+    const total = getCartTotal();
+    const code = generateTransactionCode();
+
+    const itemLines = items.map(it => `- ${it.nama} x${it.qty} (${formatRupiah(it.harga * it.qty)})`).join("\n");
 
     const message =
 `Halo Admin WarungRobux, saya ingin order:
 
-Produk: ${product.nama}
-Variasi: ${variasi}
-Jumlah: ${qty}
+Kode Transaksi: ${code}
+${itemLines}
+
 Total: ${formatRupiah(total)}
 
 Username Roblox: ${username}
-User ID: ${userId}
-No. WhatsApp: ${phone}
 Catatan: ${note}
 
 Mohon info langkah pembayaran selanjutnya. Terima kasih!`;
 
+    orderHistory.push({
+      code,
+      items,
+      username,
+      note,
+      total,
+      status: "Menunggu Konfirmasi Pembayaran",
+      date: new Date()
+    });
+
     const link = buildWhatsAppLink(WHATSAPP_NUMBER, message);
     window.open(link, "_blank", "noopener");
 
-    cartCount += 1;
-    const badge = document.getElementById("cartBadge");
-    badge.textContent = cartCount;
-    badge.hidden = false;
-
-    showToast("Pesanan disiapkan! Selesaikan di WhatsApp.");
+    cart = [];
+    updateCartBadge();
+    renderCart();
     closeCheckout();
+    showToast(`Pesanan dibuat! Kode transaksi: ${code}`);
   });
 }
 
-// ============ CEK TRANSAKSI (frontend mockup) ============
+// ============ CEK TRANSAKSI (simulasi front-end) ============
 function setupCekTransaksi(){
-  const form = document.getElementById("cekForm");
-  const input = document.getElementById("cekInput");
-  const result = document.getElementById("cekResult");
-
-  form.addEventListener("submit", (e) => {
+  document.getElementById("cekForm").addEventListener("submit", (e) => {
     e.preventDefault();
-    const query = input.value.trim();
-    if (!query) return;
+    const query = document.getElementById("cekInput").value.trim().toLowerCase();
+    const resultBox = document.getElementById("cekResult");
+    if (!query){
+      return;
+    }
 
-    result.hidden = false;
-    result.innerHTML = `
-      <p><strong>Kode/Username:</strong> ${query}</p>
-      <p style="margin-top:8px;color:var(--silver-dim);">
-        Sistem cek transaksi ini masih berupa <strong>tampilan awal (frontend)</strong> dan belum terhubung ke database pesanan.
-        Untuk mengecek status transaksi yang sebenarnya, silakan hubungi admin melalui WhatsApp dengan menyertakan kode/username di atas.
-      </p>
-      <div style="margin-top:14px;">
-        <a href="${buildWhatsAppLink(WHATSAPP_NUMBER, `Halo Admin, saya ingin cek status transaksi dengan kode/username: ${query}`)}"
-           target="_blank" rel="noopener" class="btn btn-outline btn-sm">Cek via WhatsApp</a>
-      </div>
-    `;
+    const found = orderHistory.find(o =>
+      o.code.toLowerCase() === query || o.username.toLowerCase() === query
+    );
+
+    if (found){
+      const itemLines = found.items.map(it => `${it.nama} x${it.qty}`).join(", ");
+      resultBox.innerHTML = `
+        <div class="cek-status-row"><span>Kode Transaksi</span><strong>${found.code}</strong></div>
+        <div class="cek-status-row"><span>Produk</span><span>${itemLines}</span></div>
+        <div class="cek-status-row"><span>Total</span><span>${formatRupiah(found.total)}</span></div>
+        <div class="cek-status-row"><span>Status</span><strong>${found.status}</strong></div>
+      `;
+    } else {
+      resultBox.innerHTML = `
+        <p style="margin:0;">Transaksi dengan kode/username <strong>"${document.getElementById("cekInput").value.trim()}"</strong> tidak ditemukan di sesi ini. Jika kamu baru saja checkout di perangkat/sesi lain, silakan hubungi admin melalui WhatsApp untuk pengecekan manual.</p>
+      `;
+    }
+    resultBox.hidden = false;
   });
-}
-
-// ============ TOMBOL WHATSAPP UMUM (kontak, chat admin) ============
-function setupContactButtons(){
-  const chatAdminBtn = document.getElementById("chatAdminBtn");
-  chatAdminBtn.href = buildWhatsAppLink(WHATSAPP_NUMBER, "Halo Admin WarungRobux, saya butuh bantuan.");
-
-  const panduanBtn = document.getElementById("panduanBtn");
-  panduanBtn.href = PANDUAN_URL;
 }
 
 // ============ LEGAL MODAL ============
+function openLegalModal(key){
+  const data = LEGAL_CONTENT[key];
+  if (!data) return;
+  document.getElementById("legalTitle").textContent = data.title;
+  document.getElementById("legalContent").innerHTML = data.html;
+  document.getElementById("legalOverlay").classList.add("open");
+  document.getElementById("legalOverlay").setAttribute("aria-hidden", "false");
+  document.body.style.overflow = "hidden";
+}
+
+function closeLegalModal(){
+  document.getElementById("legalOverlay").classList.remove("open");
+  document.getElementById("legalOverlay").setAttribute("aria-hidden", "true");
+  document.body.style.overflow = "";
+}
+
 function setupLegalModal(){
-  const overlay = document.getElementById("legalOverlay");
-  const closeBtn = document.getElementById("legalClose");
-  const title = document.getElementById("legalTitle");
-  const content = document.getElementById("legalContent");
-
-  function closeLegal(){
-    overlay.classList.remove("open");
-    overlay.setAttribute("aria-hidden", "true");
-    document.body.style.overflow = "";
-  }
-
   document.querySelectorAll(".footer-legal-link").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const data = LEGAL_CONTENT[btn.dataset.legal];
-      if (!data) return;
-      title.textContent = data.title;
-      content.innerHTML = data.html;
-      overlay.classList.add("open");
-      overlay.setAttribute("aria-hidden", "false");
-      document.body.style.overflow = "hidden";
-      closeBtn.focus();
-    });
+    btn.addEventListener("click", () => openLegalModal(btn.dataset.legal));
   });
-
-  closeBtn.addEventListener("click", closeLegal);
-  overlay.addEventListener("click", e => {
-    if (e.target === overlay) closeLegal();
-  });
-  document.addEventListener("keydown", e => {
-    if (e.key === "Escape" && overlay.classList.contains("open")) closeLegal();
+  document.getElementById("legalClose").addEventListener("click", closeLegalModal);
+  document.getElementById("legalOverlay").addEventListener("click", (e) => {
+    if (e.target.id === "legalOverlay") closeLegalModal();
   });
 }
 
-// ============ NAVBAR SHADOW ON SCROLL ============
-function setupNavbarScrollState(){
-  const navbar = document.getElementById("navbar");
-  window.addEventListener("scroll", () => {
-    navbar.style.boxShadow = window.scrollY > 10 ? "0 8px 24px rgba(0,0,0,.4)" : "none";
-  }, { passive: true });
+// ============ LOGIN (front-end saja, belum ada backend) ============
+function openLoginModal(){
+  document.getElementById("loginOverlay").classList.add("open");
+  document.getElementById("loginOverlay").setAttribute("aria-hidden", "false");
+  document.body.style.overflow = "hidden";
+}
+
+function closeLoginModal(){
+  document.getElementById("loginOverlay").classList.remove("open");
+  document.getElementById("loginOverlay").setAttribute("aria-hidden", "true");
+  document.body.style.overflow = "";
+}
+
+function setLoggedInUI(email){
+  const shortName = email.split("@")[0];
+  document.querySelectorAll("#loginBtn, #mobileLoginBtn").forEach(btn => {
+    btn.textContent = shortName.length > 12 ? shortName.slice(0, 12) + "…" : shortName;
+  });
+}
+
+function setupLogin(){
+  document.getElementById("loginBtn").addEventListener("click", () => {
+    if (loggedInUser){
+      showToast(`Masuk sebagai ${loggedInUser}`);
+      return;
+    }
+    openLoginModal();
+  });
+  document.getElementById("mobileLoginBtn").addEventListener("click", () => {
+    if (typeof window.__closeMobileMenu === "function") window.__closeMobileMenu();
+    if (loggedInUser){
+      showToast(`Masuk sebagai ${loggedInUser}`);
+      return;
+    }
+    openLoginModal();
+  });
+  document.getElementById("loginClose").addEventListener("click", closeLoginModal);
+  document.getElementById("loginOverlay").addEventListener("click", (e) => {
+    if (e.target.id === "loginOverlay") closeLoginModal();
+  });
+
+  document.getElementById("loginForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const email = document.getElementById("loginEmail").value.trim();
+    const password = document.getElementById("loginPassword").value;
+    if (!email || password.length < 6){
+      showToast("Lengkapi email dan kata sandi (min. 6 karakter).");
+      return;
+    }
+    loggedInUser = email;
+    setLoggedInUI(email);
+    closeLoginModal();
+    showToast(`Berhasil masuk sebagai ${email}`);
+    e.target.reset();
+  });
+}
+
+// ============ KONTAK / WA ADMIN BUTTON ============
+function setupContactButton(){
+  const btn = document.getElementById("chatAdminBtn");
+  if (!btn) return;
+  btn.href = buildWhatsAppLink(WHATSAPP_NUMBER, "Halo Admin WarungRobux, saya ingin bertanya seputar produk/pesanan.");
 }
 
 // ============ INIT ============
@@ -520,14 +765,20 @@ document.addEventListener("DOMContentLoaded", () => {
   renderTerlarisGrid();
   renderTestimonials();
   renderFaq();
+
+  setupScrollSpy();
   setupMobileMenu();
+  setupNavDropdown();
+  setupMobileSubmenu();
   setupNavSearch();
   setupFilters();
   setupCategoryLinks();
+  setupCart();
   setupCheckoutModal();
   setupCekTransaksi();
-  setupContactButtons();
   setupLegalModal();
-  setupScrollSpy();
-  setupNavbarScrollState();
+  setupLogin();
+  setupContactButton();
+
+  updateCartBadge();
 });
